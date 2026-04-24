@@ -7,6 +7,7 @@ import {
   hashToken,
   sendCheckinEmail,
 } from "@/lib/checkin";
+import { fetchGitHubAnalysis } from "@/lib/github";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -83,6 +84,59 @@ export async function requestMyCheckinLink() {
     to: user.email,
     checkinLink,
   });
+
+  revalidatePath("/dashboard");
+}
+
+export async function syncGithubProfile(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const username = String(formData.get("githubUsername") ?? "").trim();
+
+  if (!username) {
+    return;
+  }
+
+  const analysis = await fetchGitHubAnalysis(username);
+
+  await supabase.from("profiles").upsert(
+    {
+      user_id: user.id,
+      email: user.email ?? "",
+      full_name: user.user_metadata.full_name ?? null,
+      github_username: analysis.username,
+      github_analysis: analysis,
+      github_synced_at: analysis.analyzedAt,
+    },
+    {
+      onConflict: "user_id",
+    },
+  );
+
+  revalidatePath("/dashboard");
+}
+
+export async function refreshGithubProfile() {
+  const { supabase, user } = await requireUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("github_username")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const githubUsername = profile?.github_username?.trim();
+  if (!githubUsername) {
+    return;
+  }
+
+  const analysis = await fetchGitHubAnalysis(githubUsername);
+
+  await supabase
+    .from("profiles")
+    .update({
+      github_analysis: analysis,
+      github_synced_at: analysis.analyzedAt,
+    })
+    .eq("user_id", user.id);
 
   revalidatePath("/dashboard");
 }

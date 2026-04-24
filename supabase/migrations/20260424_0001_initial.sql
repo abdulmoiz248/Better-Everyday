@@ -49,6 +49,22 @@ alter table public.skills enable row level security;
 alter table public.daily_reflections enable row level security;
 alter table public.checkin_tokens enable row level security;
 
+drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_insert_own" on public.profiles;
+drop policy if exists "profiles_update_own" on public.profiles;
+
+drop policy if exists "skills_select_own" on public.skills;
+drop policy if exists "skills_insert_own" on public.skills;
+drop policy if exists "skills_update_own" on public.skills;
+drop policy if exists "skills_delete_own" on public.skills;
+
+drop policy if exists "reflections_select_own" on public.daily_reflections;
+drop policy if exists "reflections_insert_own" on public.daily_reflections;
+
+drop policy if exists "tokens_select_own" on public.checkin_tokens;
+drop policy if exists "tokens_insert_own" on public.checkin_tokens;
+drop policy if exists "tokens_update_own" on public.checkin_tokens;
+
 create policy "profiles_select_own"
 on public.profiles
 for select

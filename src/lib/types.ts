@@ -32,6 +32,25 @@ export type ProfileRecord = {
   user_id: string;
   email: string;
   full_name: string | null;
+  github_username: string | null;
+  github_analysis: GitHubAnalysisRecord | null;
+  github_synced_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type GitHubAnalysisRecord = {
+  username: string;
+  analyzedAt: string;
+  repoCount: number;
+  starCount: number;
+  topLanguages: Array<{ name: string; count: number }>;
+  inferredSkills: string[];
+  sampleRepos: Array<{
+    name: string;
+    html_url: string;
+    language: string | null;
+    stargazers_count: number;
+    topics: string[];
+  }>;
 };

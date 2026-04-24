@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import nodemailer from "nodemailer";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export function hashToken(token: string) {
@@ -41,30 +42,36 @@ export async function sendCheckinEmail({
   to: string;
   checkinLink: string;
 }) {
-  const resendApiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.CHECKIN_FROM_EMAIL;
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpPortValue = process.env.SMTP_PORT?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.replace(/\s+/g, "").trim();
+  const fromEmail = process.env.CHECKIN_FROM_EMAIL?.trim();
+  const smtpPort = smtpPortValue ? Number(smtpPortValue) : Number.NaN;
 
-  if (!resendApiKey || !fromEmail) {
+  if (!smtpHost || !smtpPortValue || !smtpUser || !smtpPass || !fromEmail) {
     console.log("Check-in link:", checkinLink, "to:", to);
     return;
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json",
+  if (!Number.isFinite(smtpPort)) {
+    throw new Error("SMTP_PORT must be a valid number");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
     },
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [to],
-      subject: "Your daily BetterEveryday check-in",
-      html: `<p>Hi there,</p><p>Your daily reflection link is ready.</p><p><a href=\"${checkinLink}\">Open today\'s check-in</a></p><p>This link expires in 24 hours.</p>`,
-    }),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to send check-in email: ${response.status} ${body}`);
-  }
+  await transporter.sendMail({
+    from: fromEmail,
+    to,
+    subject: "Your daily BetterEveryday check-in",
+    html: `<p>Hi there,</p><p>Your daily reflection link is ready.</p><p><a href=\"${checkinLink}\">Open today's check-in</a></p><p>This link expires in 24 hours.</p>`,
+  });
 }
