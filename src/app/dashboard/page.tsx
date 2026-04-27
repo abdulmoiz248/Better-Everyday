@@ -12,10 +12,12 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   GitHubAnalysisRecord,
+  LeetCodeAnalysisRecord,
   ProjectRecord,
   ProjectUpdateRecord,
   ProfileRecord,
   ReflectionRecord,
+  SkillGapAnalysisRecord,
   SkillRecord,
 } from "@/lib/types";
 
@@ -41,6 +43,30 @@ function projectStatusBadge(status: string) {
   }
 
   return "bg-zinc-100 text-zinc-700";
+}
+
+function insightSeverityBadge(severity: string) {
+  if (severity === "high") {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  if (severity === "medium") {
+    return "bg-amber-100 text-amber-700";
+  }
+
+  return "bg-zinc-100 text-zinc-700";
+}
+
+function areaSignalBadge(signal: string) {
+  if (signal === "gap") {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  if (signal === "warning") {
+    return "bg-amber-100 text-amber-700";
+  }
+
+  return "bg-emerald-100 text-emerald-700";
 }
 
 export default async function DashboardPage() {
@@ -76,7 +102,7 @@ export default async function DashboardPage() {
       supabase
         .from("profiles")
         .select(
-          "user_id, email, full_name, github_username, github_analysis, github_synced_at, created_at, updated_at",
+          "user_id, email, full_name, github_username, github_analysis, github_synced_at, leetcode_username, leetcode_analysis, skill_gap_analysis, skill_gap_synced_at, created_at, updated_at",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -101,6 +127,8 @@ export default async function DashboardPage() {
   const reflections = (reflectionsData ?? []) as ReflectionRecord[];
   const profile = profileData as ProfileRecord | null;
   const githubAnalysis = profile?.github_analysis as GitHubAnalysisRecord | null;
+  const leetcodeAnalysis = profile?.leetcode_analysis as LeetCodeAnalysisRecord | null;
+  const skillGapAnalysis = profile?.skill_gap_analysis as SkillGapAnalysisRecord | null;
   const projects = (projectsData ?? []) as ProjectRecord[];
   const projectUpdates = (projectUpdatesData ?? []) as ProjectUpdateRecord[];
   const completedSkills = skills.filter((skill) => skill.status === "completed").length;
@@ -208,12 +236,19 @@ export default async function DashboardPage() {
                 placeholder="github-username"
                 className="w-full rounded-xl border border-zinc-300 px-3 py-2"
               />
+              <input
+                type="text"
+                name="leetcodeUsername"
+                defaultValue={profile?.leetcode_username ?? ""}
+                placeholder="leetcode-username"
+                className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+              />
               <div className="flex gap-2">
                 <button
                   type="submit"
                   className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
                 >
-                  Analyze GitHub
+                  Analyze profile
                 </button>
               </div>
             </form>
@@ -227,83 +262,166 @@ export default async function DashboardPage() {
               </button>
             </form>
 
-            {githubAnalysis ? (
+            {githubAnalysis || leetcodeAnalysis || skillGapAnalysis ? (
               <div className="mt-5 space-y-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-zinc-50 p-3">
                     <p className="text-xs text-zinc-500">Repos analyzed</p>
-                    <p className="text-xl font-semibold">{githubAnalysis.repoCount}</p>
+                    <p className="text-xl font-semibold">{githubAnalysis?.repoCount ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-zinc-50 p-3">
                     <p className="text-xs text-zinc-500">Stars</p>
-                    <p className="text-xl font-semibold">{githubAnalysis.starCount}</p>
+                    <p className="text-xl font-semibold">{githubAnalysis?.starCount ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-zinc-50 p-3">
                     <p className="text-xs text-zinc-500">Synced</p>
                     <p className="text-sm font-medium">
-                      {profile?.github_synced_at
-                        ? new Date(profile.github_synced_at).toLocaleString()
+                      {profile?.skill_gap_synced_at
+                        ? new Date(profile.skill_gap_synced_at).toLocaleString()
                         : "—"}
                     </p>
                   </div>
                 </div>
 
+                {githubAnalysis ? (
+                  <>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700">Top languages</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {githubAnalysis.topLanguages.length === 0 ? (
+                          <span className="text-sm text-zinc-500">No languages detected yet.</span>
+                        ) : (
+                          githubAnalysis.topLanguages.map((item) => (
+                            <span
+                              key={item.name}
+                              className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700"
+                            >
+                              {item.name} · {item.count}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700">Inferred skills</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {githubAnalysis.inferredSkills.length === 0 ? (
+                          <span className="text-sm text-zinc-500">No inferred skills yet.</span>
+                        ) : (
+                          githubAnalysis.inferredSkills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-700"
+                            >
+                              {skill}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-zinc-700">Sample repos</p>
+                      <ul className="mt-2 space-y-2">
+                        {githubAnalysis.sampleRepos.map((repo) => (
+                          <li key={repo.html_url} className="rounded-xl border border-zinc-200 p-3">
+                            <a href={repo.html_url} target="_blank" rel="noreferrer" className="font-medium text-zinc-900 hover:underline">
+                              {repo.name}
+                            </a>
+                            <p className="text-sm text-zinc-600">
+                              {repo.language ?? "Unknown language"}
+                              {repo.topics.length ? ` · ${repo.topics.join(", ")}` : ""}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                ) : null}
+
                 <div>
-                  <p className="text-sm font-medium text-zinc-700">Top languages</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {githubAnalysis.topLanguages.length === 0 ? (
-                      <span className="text-sm text-zinc-500">No languages detected yet.</span>
-                    ) : (
-                      githubAnalysis.topLanguages.map((item) => (
-                        <span
-                          key={item.name}
-                          className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700"
-                        >
-                          {item.name} · {item.count}
-                        </span>
-                      ))
-                    )}
-                  </div>
+                  <p className="text-sm font-medium text-zinc-700">LeetCode</p>
+                  {!leetcodeAnalysis ? (
+                    <p className="mt-2 text-sm text-zinc-500">
+                      Add your LeetCode username to include problem difficulty and topic signals.
+                    </p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-sm text-zinc-700">
+                        Solved: {leetcodeAnalysis.solvedCount.total} total · {leetcodeAnalysis.solvedCount.easy} easy · {leetcodeAnalysis.solvedCount.medium} medium · {leetcodeAnalysis.solvedCount.hard} hard
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {leetcodeAnalysis.topTags.length === 0 ? (
+                          <span className="text-sm text-zinc-500">No topic data detected yet.</span>
+                        ) : (
+                          leetcodeAnalysis.topTags.slice(0, 8).map((tag) => (
+                            <span
+                              key={tag.name}
+                              className="rounded-full bg-purple-50 px-3 py-1 text-sm text-purple-700"
+                            >
+                              {tag.name} · {tag.solved}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-zinc-700">Inferred skills</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {githubAnalysis.inferredSkills.length === 0 ? (
-                      <span className="text-sm text-zinc-500">No inferred skills yet.</span>
-                    ) : (
-                      githubAnalysis.inferredSkills.map((skill) => (
-                        <span
-                          key={skill}
-                          className="rounded-full bg-emerald-50 px-3 py-1 text-sm text-emerald-700"
-                        >
-                          {skill}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-zinc-700">Sample repos</p>
-                  <ul className="mt-2 space-y-2">
-                    {githubAnalysis.sampleRepos.map((repo) => (
-                      <li key={repo.html_url} className="rounded-xl border border-zinc-200 p-3">
-                        <a href={repo.html_url} target="_blank" rel="noreferrer" className="font-medium text-zinc-900 hover:underline">
-                          {repo.name}
-                        </a>
-                        <p className="text-sm text-zinc-600">
-                          {repo.language ?? "Unknown language"}
-                          {repo.topics.length ? ` · ${repo.topics.join(", ")}` : ""}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="text-sm font-medium text-zinc-700">Skill gap detection</p>
+                  {!skillGapAnalysis ? (
+                    <p className="mt-2 text-sm text-zinc-500">Run profile analysis to detect your weak spots automatically.</p>
+                  ) : (
+                    <div className="mt-2 space-y-3">
+                      <p className="text-sm text-zinc-700">
+                        Primary weakness: {skillGapAnalysis.primaryWeakness ?? "No major gap detected"}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {skillGapAnalysis.coverage.trackedAreas.map((item) => (
+                          <span
+                            key={item.area}
+                            className={`rounded-full px-3 py-1 text-sm ${areaSignalBadge(item.signal)}`}
+                          >
+                            {item.area} · {item.daysSinceTouched >= 999 ? "not touched" : `${item.daysSinceTouched}d`}
+                          </span>
+                        ))}
+                      </div>
+                      <ul className="space-y-2">
+                        {skillGapAnalysis.insights.length === 0 ? (
+                          <li className="text-sm text-zinc-500">No urgent weakness detected yet.</li>
+                        ) : (
+                          skillGapAnalysis.insights.map((insight) => (
+                            <li key={insight.id} className="rounded-xl border border-zinc-200 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-zinc-900">{insight.title}</p>
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${insightSeverityBadge(insight.severity)}`}
+                                >
+                                  {insight.severity}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-zinc-700">{insight.message}</p>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-700">Suggested next steps</p>
+                        <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-zinc-700">
+                          {skillGapAnalysis.recommendations.map((recommendation) => (
+                            <li key={recommendation}>{recommendation}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <p className="mt-4 text-sm text-zinc-500">
-                Save a GitHub username to generate language and skill insights.
+                Save your GitHub (and optional LeetCode) username to generate language, difficulty, and skill-gap insights.
               </p>
             )}
           </div>

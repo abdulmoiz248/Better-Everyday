@@ -15,6 +15,11 @@
   - learning notes per update,
   - complete project history timeline.
 - GitHub analysis inside the dashboard that infers languages and skills from public repos.
+- Skill gap detection module in dashboard that combines:
+  - GitHub activity signals,
+  - LeetCode solved distribution + topic coverage,
+  - reflection/project text patterns,
+  and returns weakness insights like avoidance streaks (e.g. graphs not practiced for N days).
 - Server actions in [src/app/actions.ts](src/app/actions.ts) for skill CRUD-like updates and check-in submission.
 - Public, tokenized daily check-in link at [src/app/check-in/[token]/page.tsx](src/app/check-in/[token]/page.tsx):
   - no login required,
@@ -57,6 +62,17 @@
 - Optional: set `GITHUB_TOKEN` for higher API rate limits.
 - Analysis uses public repository metadata to infer likely languages and skills.
 
+### LeetCode + skill-gap analysis
+
+- Add a LeetCode username in the same dashboard analysis form (optional but recommended).
+- LeetCode analysis uses public GraphQL endpoints and does not require a private API key.
+- Skill-gap analysis is persisted in `profiles.skill_gap_analysis` and includes:
+  - tracked area coverage (`Dynamic Programming`, `Graphs`, `System Design`),
+  - difficulty-mix checks (easy-heavy warning),
+  - topic-coverage checks (e.g. low DP exposure),
+  - concrete recommendations.
+- Refresh action updates GitHub + LeetCode analysis (when usernames are saved) and recomputes the skill-gap output.
+
 ## Daily email scheduling
 
 Call this endpoint once daily from a scheduler (Supabase cron, GitHub Actions, or any cron service):
@@ -70,3 +86,5 @@ Call this endpoint once daily from a scheduler (Supabase cron, GitHub Actions, o
 - Keep check-in links public but strictly token-bound and 24-hour expiry.
 - Preserve RLS model in [supabase/schema.sql](supabase/schema.sql).
 - Prefer extending [src/app/actions.ts](src/app/actions.ts) for dashboard mutations.
+- Keep skill-gap detection deterministic unless explicitly asked to add LLM summarization.
+- If LLM is later added (Gemini/Groq), treat it as optional enrichment over the saved deterministic analysis, not a replacement.

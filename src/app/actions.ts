@@ -8,6 +8,8 @@ import {
   sendCheckinEmail,
 } from "@/lib/checkin";
 import { fetchGitHubAnalysis } from "@/lib/github";
+import { fetchLeetCodeAnalysis } from "@/lib/leetcode";
+import { buildSkillGapAnalysis } from "@/lib/skill-gap";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -99,21 +101,70 @@ export async function requestMyCheckinLink() {
 export async function syncGithubProfile(formData: FormData) {
   const { supabase, user } = await requireUser();
   const username = String(formData.get("githubUsername") ?? "").trim();
+  const leetcodeUsername = String(formData.get("leetcodeUsername") ?? "").trim();
 
-  if (!username) {
+  if (!username && !leetcodeUsername) {
     return;
   }
 
-  const analysis = await fetchGitHubAnalysis(username);
+  const [{ data: currentProfile }, { data: skillsData }, { data: reflectionsData }, { data: updatesData }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("github_username, github_analysis, leetcode_username, leetcode_analysis")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("skills")
+        .select("name, status, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("daily_reflections")
+        .select("learned_today, leetcode_question, blockers, wins, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      supabase
+        .from("project_updates")
+        .select("update_note, learned, stats, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
+  const githubLookupUsername = username || currentProfile?.github_username || "";
+  const leetcodeLookupUsername =
+    leetcodeUsername || currentProfile?.leetcode_username || "";
+
+  const githubAnalysis = githubLookupUsername
+    ? await fetchGitHubAnalysis(githubLookupUsername)
+    : null;
+  const leetcodeAnalysis = leetcodeLookupUsername
+    ? await fetchLeetCodeAnalysis(leetcodeLookupUsername)
+    : null;
+
+  const skillGapAnalysis = buildSkillGapAnalysis({
+    skills: skillsData ?? [],
+    reflections: reflectionsData ?? [],
+    projectUpdates: updatesData ?? [],
+    githubAnalysis,
+    leetcodeAnalysis,
+  });
 
   await supabase.from("profiles").upsert(
     {
       user_id: user.id,
       email: user.email ?? "",
       full_name: user.user_metadata.full_name ?? null,
-      github_username: analysis.username,
-      github_analysis: analysis,
-      github_synced_at: analysis.analyzedAt,
+      github_username: githubAnalysis?.username ?? null,
+      github_analysis: githubAnalysis,
+      github_synced_at: githubAnalysis?.analyzedAt ?? null,
+      leetcode_username: leetcodeAnalysis?.username ?? null,
+      leetcode_analysis: leetcodeAnalysis,
+      skill_gap_analysis: skillGapAnalysis,
+      skill_gap_synced_at: skillGapAnalysis.generatedAt,
     },
     {
       onConflict: "user_id",
@@ -127,22 +178,62 @@ export async function refreshGithubProfile() {
   const { supabase, user } = await requireUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("github_username")
+    .select("github_username, leetcode_username")
     .eq("user_id", user.id)
     .maybeSingle();
 
   const githubUsername = profile?.github_username?.trim();
-  if (!githubUsername) {
+  const leetcodeUsername = profile?.leetcode_username?.trim();
+
+  if (!githubUsername && !leetcodeUsername) {
     return;
   }
 
-  const analysis = await fetchGitHubAnalysis(githubUsername);
+  const [{ data: skillsData }, { data: reflectionsData }, { data: updatesData }] =
+    await Promise.all([
+      supabase
+        .from("skills")
+        .select("name, status, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("daily_reflections")
+        .select("learned_today, leetcode_question, blockers, wins, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      supabase
+        .from("project_updates")
+        .select("update_note, learned, stats, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
+  const githubAnalysis = githubUsername
+    ? await fetchGitHubAnalysis(githubUsername)
+    : null;
+  const leetcodeAnalysis = leetcodeUsername
+    ? await fetchLeetCodeAnalysis(leetcodeUsername)
+    : null;
+
+  const skillGapAnalysis = buildSkillGapAnalysis({
+    skills: skillsData ?? [],
+    reflections: reflectionsData ?? [],
+    projectUpdates: updatesData ?? [],
+    githubAnalysis,
+    leetcodeAnalysis,
+  });
 
   await supabase
     .from("profiles")
     .update({
-      github_analysis: analysis,
-      github_synced_at: analysis.analyzedAt,
+      github_analysis: githubAnalysis,
+      github_synced_at: githubAnalysis?.analyzedAt ?? null,
+      leetcode_analysis: leetcodeAnalysis,
+      skill_gap_analysis: skillGapAnalysis,
+      skill_gap_synced_at: skillGapAnalysis.generatedAt,
     })
     .eq("user_id", user.id);
 

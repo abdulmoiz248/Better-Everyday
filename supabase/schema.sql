@@ -7,6 +7,10 @@ create table if not exists public.profiles (
   github_username text,
   github_analysis jsonb,
   github_synced_at timestamptz,
+  leetcode_username text,
+  leetcode_analysis jsonb,
+  skill_gap_analysis jsonb,
+  skill_gap_synced_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

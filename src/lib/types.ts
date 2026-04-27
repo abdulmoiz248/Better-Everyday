@@ -36,6 +36,10 @@ export type ProfileRecord = {
   github_username: string | null;
   github_analysis: GitHubAnalysisRecord | null;
   github_synced_at: string | null;
+  leetcode_username: string | null;
+  leetcode_analysis: LeetCodeAnalysisRecord | null;
+  skill_gap_analysis: SkillGapAnalysisRecord | null;
+  skill_gap_synced_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -54,6 +58,68 @@ export type GitHubAnalysisRecord = {
     stargazers_count: number;
     topics: string[];
   }>;
+};
+
+export type LeetCodeAnalysisRecord = {
+  username: string;
+  analyzedAt: string;
+  solvedCount: {
+    total: number;
+    easy: number;
+    medium: number;
+    hard: number;
+  };
+  topTags: Array<{
+    name: string;
+    solved: number;
+  }>;
+  recentSubmissions: Array<{
+    title: string;
+    titleSlug: string;
+    timestamp: string;
+    statusDisplay: string;
+    lang: string;
+  }>;
+};
+
+export type SkillGapInsightSeverity = "high" | "medium" | "low";
+
+export type SkillGapInsight = {
+  id: string;
+  title: string;
+  message: string;
+  severity: SkillGapInsightSeverity;
+  evidence: string[];
+};
+
+export type SkillAreaCoverage = {
+  area: string;
+  lastTouchedAt: string | null;
+  daysSinceTouched: number;
+  signal: "healthy" | "warning" | "gap";
+};
+
+export type SkillGapAnalysisRecord = {
+  generatedAt: string;
+  primaryWeakness: string | null;
+  insights: SkillGapInsight[];
+  recommendations: string[];
+  coverage: {
+    trackedAreas: SkillAreaCoverage[];
+    github: {
+      repoCount: number;
+      inferredSkillCount: number;
+      topLanguages: Array<{ name: string; count: number }>;
+    } | null;
+    leetcode: {
+      totalSolved: number;
+      easy: number;
+      medium: number;
+      hard: number;
+      easyRatio: number;
+      topTags: Array<{ name: string; solved: number }>;
+    } | null;
+  };
 };
 
 export type ProjectRecord = {
