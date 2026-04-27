@@ -9,6 +9,11 @@
   - skill history list,
   - recent daily reflections,
   - basic analytics cards.
+- Project tracking module in dashboard with:
+  - future projects backlog,
+  - active project progress + stats updates,
+  - learning notes per update,
+  - complete project history timeline.
 - GitHub analysis inside the dashboard that infers languages and skills from public repos.
 - Server actions in [src/app/actions.ts](src/app/actions.ts) for skill CRUD-like updates and check-in submission.
 - Public, tokenized daily check-in link at [src/app/check-in/[token]/page.tsx](src/app/check-in/[token]/page.tsx):
@@ -36,6 +41,7 @@
 - Future edits should go in [supabase/migrations](supabase/migrations) as new SQL migration files.
 - Keep `schema.sql` and the latest migration state aligned when making structural database changes.
 - If you use the Supabase CLI, create new migrations instead of editing old applied ones.
+- New migration added: [supabase/migrations/20260424_0002_projects.sql](supabase/migrations/20260424_0002_projects.sql).
 
 ### SMTP values for daily emails (Nodemailer)
 

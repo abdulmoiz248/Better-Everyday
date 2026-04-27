@@ -11,6 +11,14 @@ import { fetchGitHubAnalysis } from "@/lib/github";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+function normalizeProjectStatus(rawStatus: string) {
+  if (rawStatus === "active" || rawStatus === "completed") {
+    return rawStatus;
+  }
+
+  return "future";
+}
+
 async function requireUser() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -137,6 +145,114 @@ export async function refreshGithubProfile() {
       github_synced_at: analysis.analyzedAt,
     })
     .eq("user_id", user.id);
+
+  revalidatePath("/dashboard");
+}
+
+export async function addFutureProject(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+
+  if (!title) {
+    return;
+  }
+
+  await supabase.from("projects").insert({
+    user_id: user.id,
+    title,
+    description: description || null,
+    status: "future",
+    progress_percent: 0,
+  });
+
+  revalidatePath("/dashboard");
+}
+
+export async function startProject(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const projectId = String(formData.get("projectId") ?? "").trim();
+
+  if (!projectId) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+
+  await supabase
+    .from("projects")
+    .update({
+      status: "active",
+      started_at: now,
+      updated_at: now,
+    })
+    .eq("id", projectId)
+    .eq("user_id", user.id);
+
+  await supabase.from("project_updates").insert({
+    user_id: user.id,
+    project_id: projectId,
+    update_note: "Project moved to active work",
+    progress_percent: 0,
+  });
+
+  revalidatePath("/dashboard");
+}
+
+export async function logProjectProgress(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const projectId = String(formData.get("projectId") ?? "").trim();
+  const updateNote = String(formData.get("updateNote") ?? "").trim();
+  const learned = String(formData.get("learned") ?? "").trim();
+  const stats = String(formData.get("stats") ?? "").trim();
+  const currentFocus = String(formData.get("currentFocus") ?? "").trim();
+  const status = normalizeProjectStatus(String(formData.get("status") ?? "future").trim());
+  const progressValue = Number(String(formData.get("progressPercent") ?? "0").trim());
+
+  if (!projectId || !updateNote) {
+    return;
+  }
+
+  const progressPercent = Number.isFinite(progressValue)
+    ? Math.max(0, Math.min(100, Math.round(progressValue)))
+    : 0;
+  const now = new Date().toISOString();
+  const projectUpdate: {
+    status: "future" | "active" | "completed";
+    progress_percent: number;
+    current_focus: string | null;
+    updated_at: string;
+    started_at?: string;
+    completed_at?: string;
+  } = {
+    status,
+    progress_percent: progressPercent,
+    current_focus: currentFocus || null,
+    updated_at: now,
+  };
+
+  if (status === "active") {
+    projectUpdate.started_at = now;
+  }
+
+  if (status === "completed") {
+    projectUpdate.completed_at = now;
+  }
+
+  await supabase
+    .from("projects")
+    .update(projectUpdate)
+    .eq("id", projectId)
+    .eq("user_id", user.id);
+
+  await supabase.from("project_updates").insert({
+    user_id: user.id,
+    project_id: projectId,
+    update_note: updateNote,
+    learned: learned || null,
+    stats: stats || null,
+    progress_percent: progressPercent,
+  });
 
   revalidatePath("/dashboard");
 }

@@ -1,14 +1,19 @@
 import { redirect } from "next/navigation";
 import {
+  addFutureProject,
   addSkill,
+  logProjectProgress,
   requestMyCheckinLink,
   refreshGithubProfile,
+  startProject,
   syncGithubProfile,
   updateSkillStatus,
 } from "@/app/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   GitHubAnalysisRecord,
+  ProjectRecord,
+  ProjectUpdateRecord,
   ProfileRecord,
   ReflectionRecord,
   SkillRecord,
@@ -26,6 +31,18 @@ function statusBadge(status: string) {
   return "bg-amber-100 text-amber-800";
 }
 
+function projectStatusBadge(status: string) {
+  if (status === "completed") {
+    return "bg-emerald-100 text-emerald-800";
+  }
+
+  if (status === "active") {
+    return "bg-blue-100 text-blue-800";
+  }
+
+  return "bg-zinc-100 text-zinc-700";
+}
+
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -36,8 +53,13 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  const [{ data: skillsData }, { data: reflectionsData }, { data: profileData }] =
-    await Promise.all([
+  const [
+    { data: skillsData },
+    { data: reflectionsData },
+    { data: profileData },
+    { data: projectsData },
+    { data: projectUpdatesData },
+  ] = await Promise.all([
       supabase
         .from("skills")
         .select("id, user_id, name, status, created_at, updated_at")
@@ -58,15 +80,35 @@ export default async function DashboardPage() {
         )
         .eq("user_id", user.id)
         .maybeSingle(),
+      supabase
+        .from("projects")
+        .select(
+          "id, user_id, title, description, status, progress_percent, current_focus, created_at, updated_at, started_at, completed_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("project_updates")
+        .select(
+          "id, project_id, user_id, update_note, learned, stats, progress_percent, created_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
 
   const skills = (skillsData ?? []) as SkillRecord[];
   const reflections = (reflectionsData ?? []) as ReflectionRecord[];
   const profile = profileData as ProfileRecord | null;
   const githubAnalysis = profile?.github_analysis as GitHubAnalysisRecord | null;
+  const projects = (projectsData ?? []) as ProjectRecord[];
+  const projectUpdates = (projectUpdatesData ?? []) as ProjectUpdateRecord[];
   const completedSkills = skills.filter((skill) => skill.status === "completed").length;
   const pendingSkills = skills.filter((skill) => skill.status !== "completed").length;
   const totalReflections = reflections.length;
+  const futureProjects = projects.filter((project) => project.status === "future");
+  const activeProjects = projects.filter((project) => project.status === "active");
+  const projectTitleById = new Map(projects.map((project) => [project.id, project.title]));
 
   return (
     <div className="min-h-screen bg-zinc-50 px-4 py-8 text-zinc-900 sm:px-8">
@@ -108,6 +150,18 @@ export default async function DashboardPage() {
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-sm text-zinc-500">Pending / learning</p>
             <p className="text-3xl font-semibold">{pendingSkills}</p>
+          </div>
+          <div className="rounded-2xl bg-white p-5 shadow-sm">
+            <p className="text-sm text-zinc-500">Active projects</p>
+            <p className="text-3xl font-semibold">{activeProjects.length}</p>
+          </div>
+          <div className="rounded-2xl bg-white p-5 shadow-sm">
+            <p className="text-sm text-zinc-500">Future projects</p>
+            <p className="text-3xl font-semibold">{futureProjects.length}</p>
+          </div>
+          <div className="rounded-2xl bg-white p-5 shadow-sm">
+            <p className="text-sm text-zinc-500">Project updates logged</p>
+            <p className="text-3xl font-semibold">{projectUpdates.length}</p>
           </div>
         </section>
 
@@ -323,6 +377,180 @@ export default async function DashboardPage() {
                       Save
                     </button>
                   </form>
+                </li>
+              ))
+            )}
+          </ul>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold">Future projects</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Add projects you plan to build later.
+            </p>
+            <form action={addFutureProject} className="mt-4 space-y-3">
+              <input
+                type="text"
+                name="title"
+                placeholder="e.g. AI expense tracker"
+                required
+                className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+              />
+              <textarea
+                name="description"
+                rows={3}
+                placeholder="What will this project do?"
+                className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+              />
+              <button
+                type="submit"
+                className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Add future project
+              </button>
+            </form>
+
+            <ul className="mt-4 space-y-3">
+              {futureProjects.length === 0 ? (
+                <li className="text-sm text-zinc-500">No future projects added yet.</li>
+              ) : (
+                futureProjects.map((project) => (
+                  <li key={project.id} className="rounded-xl border border-zinc-200 p-3">
+                    <p className="font-medium">{project.title}</p>
+                    {project.description ? (
+                      <p className="mt-1 text-sm text-zinc-600">{project.description}</p>
+                    ) : null}
+                    <form action={startProject} className="mt-3">
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <button
+                        type="submit"
+                        className="rounded-full border border-zinc-300 px-3 py-2 text-sm"
+                      >
+                        Start this project
+                      </button>
+                    </form>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold">Current projects</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Update progress, stats, and what you learned today.
+            </p>
+            <div className="mt-4 space-y-4">
+              {activeProjects.length === 0 ? (
+                <p className="text-sm text-zinc-500">No active project yet. Start one from future projects.</p>
+              ) : (
+                activeProjects.map((project) => (
+                  <div key={project.id} className="rounded-xl border border-zinc-200 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">{project.title}</p>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${projectStatusBadge(project.status)}`}
+                      >
+                        {project.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-600">
+                      Progress: {project.progress_percent}%
+                    </p>
+                    {project.current_focus ? (
+                      <p className="text-sm text-zinc-600">
+                        Current focus: {project.current_focus}
+                      </p>
+                    ) : null}
+
+                    <form action={logProjectProgress} className="mt-3 space-y-3">
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <textarea
+                        name="updateNote"
+                        rows={3}
+                        required
+                        placeholder="What did you do today?"
+                        className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+                      />
+                      <textarea
+                        name="learned"
+                        rows={2}
+                        placeholder="What new thing did you learn?"
+                        className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+                      />
+                      <textarea
+                        name="stats"
+                        rows={2}
+                        placeholder="Stats: commits, tasks done, bugs fixed, hours spent..."
+                        className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+                      />
+                      <input
+                        type="text"
+                        name="currentFocus"
+                        placeholder="Current focus"
+                        defaultValue={project.current_focus ?? ""}
+                        className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          type="number"
+                          name="progressPercent"
+                          min={0}
+                          max={100}
+                          defaultValue={project.progress_percent}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+                        />
+                        <select
+                          name="status"
+                          defaultValue={project.status}
+                          className="w-full rounded-xl border border-zinc-300 px-3 py-2"
+                        >
+                          <option value="future">Future</option>
+                          <option value="active">Active</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
+                      <button
+                        type="submit"
+                        className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+                      >
+                        Save update
+                      </button>
+                    </form>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Project history</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Complete timeline of what you did, your progress, stats, and learnings.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {projectUpdates.length === 0 ? (
+              <li className="text-sm text-zinc-500">No project updates logged yet.</li>
+            ) : (
+              projectUpdates.map((update) => (
+                <li key={update.id} className="rounded-xl border border-zinc-200 p-4">
+                  <p className="text-xs text-zinc-500">
+                    {new Date(update.created_at).toLocaleString()} · {projectTitleById.get(update.project_id) ?? "Unknown project"}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">{update.update_note}</p>
+                  {update.learned ? (
+                    <p className="mt-1 text-sm text-zinc-700">Learned: {update.learned}</p>
+                  ) : null}
+                  {update.stats ? (
+                    <p className="mt-1 text-sm text-zinc-700">Stats: {update.stats}</p>
+                  ) : null}
+                  {update.progress_percent !== null ? (
+                    <p className="mt-1 text-sm text-zinc-600">
+                      Progress snapshot: {update.progress_percent}%
+                    </p>
+                  ) : null}
                 </li>
               ))
             )}

@@ -1,4 +1,5 @@
 export type SkillStatus = "pending" | "learning" | "completed";
+export type ProjectStatus = "future" | "active" | "completed";
 
 export type SkillRecord = {
   id: string;
@@ -53,4 +54,29 @@ export type GitHubAnalysisRecord = {
     stargazers_count: number;
     topics: string[];
   }>;
+};
+
+export type ProjectRecord = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: ProjectStatus;
+  progress_percent: number;
+  current_focus: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export type ProjectUpdateRecord = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  update_note: string;
+  learned: string | null;
+  stats: string | null;
+  progress_percent: number | null;
+  created_at: string;
 };
