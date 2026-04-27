@@ -10,6 +10,7 @@ import {
   updateSkillStatus,
 } from "@/app/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import GenerateWeeklyReviewButton from "@/components/generate-weekly-review-button";
 import {
   GitHubAnalysisRecord,
   LeetCodeAnalysisRecord,
@@ -18,6 +19,7 @@ import {
   ProfileRecord,
   ReflectionRecord,
   SkillGapAnalysisRecord,
+  WeeklyReviewRecord,
   SkillRecord,
 } from "@/lib/types";
 
@@ -85,6 +87,7 @@ export default async function DashboardPage() {
     { data: profileData },
     { data: projectsData },
     { data: projectUpdatesData },
+    { data: weeklyReviewsData },
   ] = await Promise.all([
       supabase
         .from("skills")
@@ -102,7 +105,7 @@ export default async function DashboardPage() {
       supabase
         .from("profiles")
         .select(
-          "user_id, email, full_name, github_username, github_analysis, github_synced_at, leetcode_username, leetcode_analysis, skill_gap_analysis, skill_gap_synced_at, created_at, updated_at",
+          "user_id, email, full_name, github_username, github_analysis, github_synced_at, leetcode_username, leetcode_analysis, skill_gap_analysis, skill_gap_synced_at, current_streak, longest_streak, streak_last_updated, created_at, updated_at",
         )
         .eq("user_id", user.id)
         .maybeSingle(),
@@ -121,6 +124,14 @@ export default async function DashboardPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50),
+      supabase
+        .from("weekly_reviews")
+        .select(
+          "id, user_id, week_start_date, week_end_date, total_hours, problems_solved, skills_improved, missed_days, depth_score, consistency_score, variety_score, brutal_reflection, llm_feedback, created_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1),
     ]);
 
   const skills = (skillsData ?? []) as SkillRecord[];
@@ -129,6 +140,8 @@ export default async function DashboardPage() {
   const githubAnalysis = profile?.github_analysis as GitHubAnalysisRecord | null;
   const leetcodeAnalysis = profile?.leetcode_analysis as LeetCodeAnalysisRecord | null;
   const skillGapAnalysis = profile?.skill_gap_analysis as SkillGapAnalysisRecord | null;
+  const weeklyReviews = (weeklyReviewsData ?? []) as WeeklyReviewRecord[];
+  const lastWeeklyReview = weeklyReviews[0] || null;
   const projects = (projectsData ?? []) as ProjectRecord[];
   const projectUpdates = (projectUpdatesData ?? []) as ProjectUpdateRecord[];
   const completedSkills = skills.filter((skill) => skill.status === "completed").length;
@@ -165,6 +178,74 @@ export default async function DashboardPage() {
             </form>
           </div>
         </header>
+
+        {/* Streak & Weekly Analytics */}
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Your Progress</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-4">
+            <div className="rounded-xl bg-rose-50 p-4">
+              <p className="text-xs text-rose-600">Current Streak</p>
+              <p className="mt-1 text-3xl font-bold text-rose-700">🔥 {profile?.current_streak ?? 0}</p>
+              <p className="mt-1 text-xs text-rose-600">Longest: {profile?.longest_streak ?? 0}</p>
+            </div>
+            {lastWeeklyReview ? (
+              <>
+                <div className="rounded-xl bg-blue-50 p-4">
+                  <p className="text-xs text-blue-600">Depth Score</p>
+                  <p className="mt-1 text-3xl font-bold text-blue-700">{lastWeeklyReview.depth_score ?? 0}%</p>
+                  <p className="mt-1 text-xs text-blue-600">Easy vs Hard</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-4">
+                  <p className="text-xs text-emerald-600">Consistency</p>
+                  <p className="mt-1 text-3xl font-bold text-emerald-700">{lastWeeklyReview.consistency_score ?? 0}%</p>
+                  <p className="mt-1 text-xs text-emerald-600">Daily Check-ins</p>
+                </div>
+                <div className="rounded-xl bg-purple-50 p-4">
+                  <p className="text-xs text-purple-600">Variety</p>
+                  <p className="mt-1 text-3xl font-bold text-purple-700">{lastWeeklyReview.variety_score ?? 0}%</p>
+                  <p className="mt-1 text-xs text-purple-600">Topic Diversity</p>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-3 rounded-xl bg-zinc-100 p-4">
+                <p className="text-sm text-zinc-600">Weekly review coming...</p>
+              </div>
+            )}
+          </div>
+
+          {lastWeeklyReview && (
+            <div className="mt-4 space-y-3 border-t border-zinc-200 pt-4">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-zinc-500">Problems Solved</p>
+                  <p className="text-lg font-semibold">{lastWeeklyReview.problems_solved ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500">Hours Spent</p>
+                  <p className="text-lg font-semibold">{lastWeeklyReview.total_hours ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500">Missed Days</p>
+                  <p className="text-lg font-semibold text-rose-600">{lastWeeklyReview.missed_days ?? 0}</p>
+                </div>
+              </div>
+
+              {lastWeeklyReview.llm_feedback && (
+                <div className="mt-3 rounded-lg bg-amber-50 p-4">
+                  <p className="text-xs font-semibold text-amber-900">Weekly Brutal Review</p>
+                  <p className="mt-2 text-sm text-amber-900">{lastWeeklyReview.llm_feedback}</p>
+                          <div className="mt-6 border-t border-zinc-200 pt-6">
+                            <p className="text-sm text-zinc-600 mb-3">Generate or refresh your weekly brutal review:</p>
+                            <GenerateWeeklyReviewButton />
+                          </div>
+                </div>
+              )}
+
+              
+            </div>
+          )}
+        </section>
+
 
         <section className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl bg-white p-5 shadow-sm">

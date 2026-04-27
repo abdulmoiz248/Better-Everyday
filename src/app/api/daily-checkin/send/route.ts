@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const supabaseAdmin = createSupabaseAdminClient();
   const { data: profiles, error } = await supabaseAdmin
     .from("profiles")
-    .select("user_id, email")
+    .select("user_id, email, current_streak")
     .not("email", "is", null);
 
   if (error) {
@@ -32,18 +32,50 @@ export async function POST(request: Request) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const sent: string[] = [];
+  const errors: Array<{ email: string; error: string }> = [];
 
   for (const profile of profiles ?? []) {
-    const token = await createCheckinTokenForUser(profile.user_id, profile.email);
-    const checkinLink = `${appUrl}/check-in/${token}`;
+    try {
+      const token = await createCheckinTokenForUser(profile.user_id, profile.email);
+      const checkinLink = `${appUrl}/check-in/${token}`;
 
-    await sendCheckinEmail({
-      to: profile.email,
-      checkinLink,
-    });
+      // Fetch yesterday's reflection for context
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setUTCHours(0, 0, 0, 0);
 
-    sent.push(profile.email);
+      const tomorrow = new Date(yesterday);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+      const { data: lastReflection } = await supabaseAdmin
+        .from("daily_reflections")
+        .select("learned_today, created_at")
+        .eq("user_id", profile.user_id)
+        .gte("created_at", yesterday.toISOString())
+        .lt("created_at", tomorrow.toISOString())
+        .maybeSingle();
+
+      await sendCheckinEmail({
+        to: profile.email,
+        checkinLink,
+        currentStreak: profile.current_streak || 0,
+        lastReflection: lastReflection || null,
+      });
+
+      sent.push(profile.email);
+    } catch (err) {
+      errors.push({
+        email: profile.email,
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
   }
 
-  return Response.json({ ok: true, sentCount: sent.length, sent });
+  return Response.json({
+    ok: true,
+    sentCount: sent.length,
+    errorCount: errors.length,
+    sent,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 }

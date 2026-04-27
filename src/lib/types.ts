@@ -40,6 +40,10 @@ export type ProfileRecord = {
   leetcode_analysis: LeetCodeAnalysisRecord | null;
   skill_gap_analysis: SkillGapAnalysisRecord | null;
   skill_gap_synced_at: string | null;
+  current_streak: number;
+  longest_streak: number;
+  streak_last_updated: string | null;
+  last_weekly_review_date: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -145,4 +149,37 @@ export type ProjectUpdateRecord = {
   stats: string | null;
   progress_percent: number | null;
   created_at: string;
+};
+export type WeeklyReviewRecord = {
+  id: string;
+  user_id: string;
+  week_start_date: string;
+  week_end_date: string;
+  total_hours: number | null;
+  problems_solved: number | null;
+  skills_improved: string[] | null;
+  missed_days: number | null;
+  depth_score: number | null;
+  consistency_score: number | null;
+  variety_score: number | null;
+  brutal_reflection: string | null;
+  llm_feedback: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StreakMetrics = {
+  current_streak: number;
+  longest_streak: number;
+  streak_last_updated: string | null;
+};
+
+export type WeeklyMetrics = {
+  depthScore: number;
+  consistencyScore: number;
+  varietyScore: number;
+  totalHours: number;
+  problemsSolved: number;
+  skillsImproved: string[];
+  missedDays: number;
 };

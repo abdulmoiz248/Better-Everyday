@@ -379,18 +379,70 @@ export async function submitDailyCheckin(formData: FormData) {
     throw new Error("This check-in link has expired");
   }
 
+  const userId = tokenRow.user_id;
+  const now = new Date();
+
+  // Insert the daily reflection
   await supabaseAdmin.from("daily_reflections").insert({
-    user_id: tokenRow.user_id,
+    user_id: userId,
     learned_today: learnedToday,
     leetcode_question: leetcodeQuestion || null,
     blockers: blockers || null,
     wins: wins || null,
   });
 
+  // Mark token as used
   await supabaseAdmin
     .from("checkin_tokens")
-    .update({ used_at: new Date().toISOString() })
+    .update({ used_at: now.toISOString() })
     .eq("id", tokenRow.id);
+
+  // Update streak
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("current_streak, longest_streak, streak_last_updated")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  let newStreak = 1;
+  let newLongestStreak = 1;
+
+  if (profile) {
+    const lastUpdated = profile.streak_last_updated
+      ? new Date(profile.streak_last_updated)
+      : new Date(0);
+    const daysSinceLastUpdate = Math.floor(
+      (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // If updated within the last 24 hours, don't increment (same day)
+    if (daysSinceLastUpdate === 0) {
+      newStreak = profile.current_streak;
+    } else if (daysSinceLastUpdate === 1) {
+      // Consecutive day: increment
+      newStreak = (profile.current_streak || 0) + 1;
+    } else {
+      // Streak broken: reset to 1
+      newStreak = 1;
+    }
+
+    newLongestStreak = Math.max(newStreak, profile.longest_streak || 0);
+  }
+
+  await supabaseAdmin
+    .from("profiles")
+    .upsert(
+      {
+        user_id: userId,
+        current_streak: newStreak,
+        longest_streak: newLongestStreak,
+        streak_last_updated: now.toISOString(),
+      },
+      {
+        onConflict: "user_id",
+      },
+    );
 
   redirect("/check-in/success");
 }
+
