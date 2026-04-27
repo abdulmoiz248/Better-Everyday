@@ -1,4 +1,5 @@
 import { WeeklyMetrics } from "@/lib/types";
+import { GoogleGenAI } from "@google/genai";
 
 type BrutalReviewInput = {
   username: string;
@@ -14,48 +15,16 @@ async function callGemini(prompt: string): Promise<string> {
     throw new Error("GEMINI_API_KEY is not set");
   }
 
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 1,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-      },
-    }),
-    cache: "no-store",
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} ${errText}`);
+  const text = response.text;
+  if (!text) {
+    throw new Error("Gemini API returned empty response");
   }
-
-  const data = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-  };
-
-  const text =
-    data.candidates?.[0]?.content?.parts?.[0]?.text ||
-    "Failed to generate brutal review.";
 
   return text;
 }
@@ -171,7 +140,7 @@ function generateFallbackBrutalReview(input: BrutalReviewInput): string {
 
   if (input.metrics.varietyScore < 50) {
     lines.push(
-      "Only ${input.metrics.skillsImproved.length} skill areas touched. You're stagnating in comfort zones.",
+      `Only ${input.metrics.skillsImproved.length} skill areas touched. You're stagnating in comfort zones.`,
     );
   }
 

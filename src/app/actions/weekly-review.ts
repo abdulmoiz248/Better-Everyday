@@ -1,17 +1,18 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { computeWeeklyMetrics } from "@/lib/metrics";
 import { generateBrutalReview } from "@/lib/brutal-review";
 
 export async function computeAndSaveWeeklyReview(userId: string, weekStartDate: Date, weekEndDate: Date) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   // Get user profile
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("github_username, leetcode_username")
-    .eq("id", userId)
+    .eq("user_id", userId)
     .single();
 
   if (profileError || !profile) {
@@ -28,7 +29,7 @@ export async function computeAndSaveWeeklyReview(userId: string, weekStartDate: 
 
   // Fetch reflections in week
   const { data: reflections } = await supabase
-    .from("reflections")
+    .from("daily_reflections")
     .select("learned_today, leetcode_question, blockers, wins, created_at")
     .eq("user_id", userId)
     .gte("created_at", weekStartDate.toISOString())
@@ -46,7 +47,7 @@ export async function computeAndSaveWeeklyReview(userId: string, weekStartDate: 
   const { data: leetcodeAnalysisData } = await supabase
     .from("profiles")
     .select("leetcode_analysis")
-    .eq("id", userId)
+    .eq("user_id", userId)
     .single();
 
   // Compute metrics

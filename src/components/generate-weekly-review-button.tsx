@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function GenerateWeeklyReviewButton() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +25,8 @@ export default function GenerateWeeklyReviewButton() {
         throw new Error(data.error || "Failed to generate weekly review");
       }
 
-      setMessage("✅ Weekly review generated! Refresh to see updates.");
+      setMessage("✅ Weekly review generated!");
+      router.refresh();
     } catch (err) {
       setError(String(err instanceof Error ? err.message : err));
     } finally {

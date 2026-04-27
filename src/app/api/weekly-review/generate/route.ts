@@ -60,7 +60,7 @@ export async function PUT(request: Request) {
     const admin = createSupabaseAdminClient();
 
     // Get all users with active profiles
-    const { data: profiles } = await admin.from("profiles").select("id");
+    const { data: profiles } = await admin.from("profiles").select("user_id");
 
     if (!profiles || profiles.length === 0) {
       return Response.json({ ok: true, generated: 0 });
@@ -72,11 +72,11 @@ export async function PUT(request: Request) {
     const results = [];
     for (const profile of profiles) {
       try {
-        const result = await computeAndSaveWeeklyReview(profile.id, weekStartDate, now);
-        results.push({ userId: profile.id, ok: true, data: result });
+        const result = await computeAndSaveWeeklyReview(profile.user_id, weekStartDate, now);
+        results.push({ userId: profile.user_id, ok: true, data: result });
       } catch (err) {
-        console.error(`Failed for user ${profile.id}:`, err);
-        results.push({ userId: profile.id, ok: false, error: String(err) });
+        console.error(`Failed for user ${profile.user_id}:`, err);
+        results.push({ userId: profile.user_id, ok: false, error: String(err) });
       }
     }
 
