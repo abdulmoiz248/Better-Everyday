@@ -45,12 +45,16 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '❌ Daily check-in email send failed. Check logs.'
-            })
+            if (context.issue?.number) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '❌ Daily check-in email send failed. Check logs.'
+              })
+            } else {
+              core.warning('Daily check-in email send failed. Check logs.')
+            }
 
   generate-weekly-reviews:
     runs-on: ubuntu-latest
@@ -83,9 +87,13 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '❌ Weekly review generation failed. Check logs.'
-            })
+            if (context.issue?.number) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '❌ Weekly review generation failed. Check logs.'
+              })
+            } else {
+              core.warning('Weekly review generation failed. Check logs.')
+            }
