@@ -11,13 +11,15 @@ export async function POST(request: Request) {
 
   if (!expected) {
     return Response.json(
-      { error: "Missing CRON_SECRET environment variable" },
+      { error: "Missing CRON_SECRET environment variable on the server" },
       { status: 500 },
     );
   }
 
   if (authorization !== `Bearer ${expected}`) {
-    return unauthorized("Invalid authorization");
+    return unauthorized(
+      "Unauthorized cron request. Check that the workflow CRON_SECRET matches the deployed CRON_SECRET.",
+    );
   }
 
   const supabaseAdmin = createSupabaseAdminClient();

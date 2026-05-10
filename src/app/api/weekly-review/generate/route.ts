@@ -54,7 +54,13 @@ export async function PUT(request: Request) {
     // Protected by CRON_SECRET header
     const secret = request.headers.get("Authorization")?.replace("Bearer ", "");
     if (secret !== process.env.CRON_SECRET) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+      return Response.json(
+        {
+          error:
+            "Unauthorized cron request. Check that the workflow CRON_SECRET matches the deployed CRON_SECRET.",
+        },
+        { status: 401 },
+      );
     }
 
     const admin = createSupabaseAdminClient();
