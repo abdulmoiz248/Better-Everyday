@@ -53,6 +53,7 @@ export async function addSkill(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/skills");
 }
 
 export async function updateSkillStatus(formData: FormData) {
@@ -77,6 +78,7 @@ export async function updateSkillStatus(formData: FormData) {
     .eq("user_id", user.id);
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/skills");
 }
 
 export async function requestMyCheckinLink() {
@@ -172,6 +174,7 @@ export async function syncGithubProfile(formData: FormData) {
   );
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/analytics");
 }
 
 export async function refreshGithubProfile() {
@@ -238,6 +241,7 @@ export async function refreshGithubProfile() {
     .eq("user_id", user.id);
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/analytics");
 }
 
 export async function addFutureProject(formData: FormData) {
@@ -258,6 +262,7 @@ export async function addFutureProject(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/projects");
 }
 
 export async function startProject(formData: FormData) {
@@ -288,6 +293,7 @@ export async function startProject(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/projects");
 }
 
 export async function logProjectProgress(formData: FormData) {
@@ -346,6 +352,7 @@ export async function logProjectProgress(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/projects");
 }
 
 export async function submitDailyCheckin(formData: FormData) {

@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BetterEveryday",
-  description: "Daily skill tracker with email check-ins",
+  title: "BetterEveryday — Daily Growth Tracker",
+  description:
+    "Track skills, build projects, analyze gaps, and get brutally honest weekly reviews. Compound your growth — 1.01^365 = 37.8×",
 };
 
 export default function RootLayout({
@@ -27,6 +28,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <meta name="color-scheme" content="dark" />
+        <meta name="theme-color" content="#0a0b0f" />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

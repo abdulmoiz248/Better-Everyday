@@ -35,16 +35,23 @@ export default function GenerateWeeklyReviewButton() {
   };
 
   return (
-    <div className="space-y-2">
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <button
         onClick={handleGenerateReview}
         disabled={loading}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-zinc-400"
+        className="btn btn-primary"
       >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+        </svg>
         {loading ? "Generating..." : "Generate Weekly Review"}
       </button>
-      {message && <p className="text-sm text-green-600">{message}</p>}
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {message && (
+        <span style={{ fontSize: "0.75rem", color: "#34d399" }}>{message}</span>
+      )}
+      {error && (
+        <span style={{ fontSize: "0.75rem", color: "#f87171" }}>{error}</span>
+      )}
     </div>
   );
 }
