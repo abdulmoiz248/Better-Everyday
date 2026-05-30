@@ -357,13 +357,31 @@ export async function logProjectProgress(formData: FormData) {
 
 export async function submitDailyCheckin(formData: FormData) {
   const token = String(formData.get("token") ?? "").trim();
-  const learnedToday = String(formData.get("learnedToday") ?? "").trim();
-  const leetcodeQuestion = String(formData.get("leetcodeQuestion") ?? "").trim();
-  const blockers = String(formData.get("blockers") ?? "").trim();
-  const wins = String(formData.get("wins") ?? "").trim();
 
-  if (!token || !learnedToday) {
+  if (!token) {
     throw new Error("Invalid check-in submission");
+  }
+
+  // Collect all custom_* fields from the form
+  const customFields: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("custom_") && typeof value === "string") {
+      const fieldId = key.slice(7); // remove "custom_" prefix
+      const trimmed = value.trim();
+      if (trimmed) {
+        customFields[fieldId] = trimmed;
+      }
+    }
+  }
+
+  // Backward compatibility: map standard field IDs to legacy columns
+  const learnedToday = customFields["learned"] ?? Object.values(customFields)[0] ?? "";
+  const leetcodeQuestion = customFields["leetcode_question"] ?? customFields["practice"] ?? null;
+  const blockers = customFields["blockers"] ?? null;
+  const wins = customFields["wins"] ?? null;
+
+  if (!learnedToday) {
+    throw new Error("At least one field must be filled in");
   }
 
   const tokenHash = hashToken(token);
@@ -389,13 +407,14 @@ export async function submitDailyCheckin(formData: FormData) {
   const userId = tokenRow.user_id;
   const now = new Date();
 
-  // Insert the daily reflection
+  // Insert the daily reflection with both legacy and custom fields
   await supabaseAdmin.from("daily_reflections").insert({
     user_id: userId,
     learned_today: learnedToday,
     leetcode_question: leetcodeQuestion || null,
     blockers: blockers || null,
     wins: wins || null,
+    custom_fields: customFields,
   });
 
   // Mark token as used

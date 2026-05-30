@@ -6,6 +6,7 @@ type BrutalReviewInput = {
   weekStartDate: Date;
   weekEndDate: Date;
   metrics: WeeklyMetrics;
+  reviewContext?: string;
 };
 
 async function callGemini(prompt: string): Promise<string> {
@@ -79,31 +80,38 @@ async function callGroq(prompt: string): Promise<string> {
 export async function generateBrutalReview(input: BrutalReviewInput): Promise<string> {
   const weekDateRange = `${input.weekStartDate.toLocaleDateString()} to ${input.weekEndDate.toLocaleDateString()}`;
 
+  const contextSection = input.reviewContext
+    ? `USER FOCUS CONTEXT (Crucial: prioritize feedback relevant to this domain):
+${input.reviewContext}`
+    : "USER FOCUS CONTEXT: General personal growth, productivity, and habit tracking.";
+
   const prompt = `You are a brutally honest mentor who is tired of motivational BS. Generate a HARSH, UNCOMFORTABLE weekly review for someone named "${input.username}".
+
+${contextSection}
 
 Week: ${weekDateRange}
 
 METRICS:
-- Depth Score (easy vs hard problems): ${input.metrics.depthScore}/100
-- Consistency (daily checkins): ${input.metrics.consistencyScore}/100
-- Variety (topic diversity): ${input.metrics.varietyScore}/100
-- Total Hours Spent: ${input.metrics.totalHours}
-- Problems Solved: ${input.metrics.problemsSolved}
-- Skills Improved: ${input.metrics.skillsImproved.join(", ") || "None"}
+- Consistency Score (daily checkins): ${input.metrics.consistencyScore}/100
+- Variety Score (topic/skill diversity): ${input.metrics.varietyScore}/100
+- Depth/Focus Score (challenge difficulty / hard vs easy ratio): ${input.metrics.depthScore}/100
+- Total Hours Spent on Growth: ${input.metrics.totalHours} hours
+- Practice sessions / items logged: ${input.metrics.problemsSolved}
+- Skills/Topics practicing: ${input.metrics.skillsImproved.join(", ") || "None"}
 - Missed Days: ${input.metrics.missedDays}
 
 RULES FOR YOUR RESPONSE:
-1. DO NOT be motivational or encouraging
+1. DO NOT be motivational or encouraging.
 2. DO NOT use phrases like "Great job!" or "Keep it up!"
-3. DO focus on hard truths and areas of failure
-4. DO be specific about weaknesses
+3. DO focus on hard truths and areas of failure.
+4. DO be specific about weaknesses and stagnation.
 5. DO ask uncomfortable questions:
    - "Why did you waste time?"
    - "What are you actually avoiding?"
    - "Is this really a priority for you?"
-6. DO point out patterns (consistency failures, easy-problem bias, etc.)
-7. DO be short and direct (max 200 words)
-8. DO calculate what 1% daily improvement means for the year (1.01^365 vs 0.99^365)
+6. DO point out patterns (consistency failures, staying in comfort zones, avoidance, low hours).
+7. DO be short and direct (max 200 words).
+8. DO calculate what 1% daily improvement means for the year (1.01^365 = 37.8x growth vs 0.99^365 = 0.03x decay) and how their metrics place them on this path.
 
 Generate the brutal review now. Be harsh. Be real. No fluff.`;
 

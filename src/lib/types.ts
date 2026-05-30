@@ -17,6 +17,7 @@ export type ReflectionRecord = {
   leetcode_question: string | null;
   blockers: string | null;
   wins: string | null;
+  custom_fields: Record<string, string> | null;
   created_at: string;
 };
 
@@ -183,3 +184,44 @@ export type WeeklyMetrics = {
   skillsImproved: string[];
   missedDays: number;
 };
+
+/* ── Customization types ── */
+
+export type CheckinFieldType = "text" | "textarea" | "number";
+
+export type CheckinField = {
+  id: string;
+  label: string;
+  type: CheckinFieldType;
+  required: boolean;
+  placeholder?: string;
+};
+
+export type TrackedAreaConfig = {
+  name: string;
+  aliases: string[];
+};
+
+export type IntegrationsConfig = {
+  github: boolean;
+  leetcode: boolean;
+};
+
+export type UserSettingsRecord = {
+  user_id: string;
+  checkin_fields: CheckinField[];
+  tracked_areas: TrackedAreaConfig[];
+  review_context: string;
+  timezone: string;
+  integrations: IntegrationsConfig;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Default check-in fields for new users */
+export const DEFAULT_CHECKIN_FIELDS: CheckinField[] = [
+  { id: "learned", label: "What did you learn today?", type: "textarea", required: true, placeholder: "Today I learned about..." },
+  { id: "practice", label: "What did you practice?", type: "text", required: false, placeholder: "e.g. Piano scales, essay writing, algorithm problems..." },
+  { id: "wins", label: "What went well?", type: "textarea", required: false, placeholder: "Wins, progress, small victories..." },
+  { id: "blockers", label: "Any blockers or challenges?", type: "textarea", required: false, placeholder: "What slowed you down..." },
+];

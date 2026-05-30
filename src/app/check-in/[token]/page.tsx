@@ -1,6 +1,8 @@
 import { submitDailyCheckin } from "@/app/actions";
 import { hashToken } from "@/lib/checkin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { DEFAULT_CHECKIN_FIELDS } from "@/lib/types";
+import type { CheckinField, UserSettingsRecord } from "@/lib/types";
 
 type Props = {
   params: Promise<{
@@ -15,7 +17,7 @@ export default async function CheckinPage({ params }: Props) {
 
   const { data: tokenRow } = await supabaseAdmin
     .from("checkin_tokens")
-    .select("id, expires_at, used_at")
+    .select("id, user_id, expires_at, used_at")
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
@@ -50,6 +52,16 @@ export default async function CheckinPage({ params }: Props) {
     );
   }
 
+  // Fetch user's custom check-in fields
+  const { data: settingsData } = await supabaseAdmin
+    .from("user_settings")
+    .select("checkin_fields")
+    .eq("user_id", tokenRow.user_id)
+    .maybeSingle();
+
+  const settings = settingsData as Pick<UserSettingsRecord, "checkin_fields"> | null;
+  const checkinFields: CheckinField[] = settings?.checkin_fields ?? DEFAULT_CHECKIN_FIELDS;
+
   return (
     <div
       style={{
@@ -77,64 +89,49 @@ export default async function CheckinPage({ params }: Props) {
               Daily Check-in ✅
             </h1>
             <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
-              Share what you learned today. This link works only once.
+              Record your progress for today. This link works only once.
             </p>
           </div>
 
           <form action={submitDailyCheckin} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <input type="hidden" name="token" value={token} />
 
-            <div className="form-group">
-              <label htmlFor="learnedToday" className="form-label">
-                What did you learn today? <span style={{ color: "#f87171" }}>*</span>
-              </label>
-              <textarea
-                id="learnedToday"
-                name="learnedToday"
-                required
-                rows={4}
-                className="textarea"
-                placeholder="Today I learned about..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="leetcodeQuestion" className="form-label">
-                Which LeetCode question did you solve?
-              </label>
-              <input
-                id="leetcodeQuestion"
-                name="leetcodeQuestion"
-                placeholder="e.g. Two Sum (#1)"
-                className="input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="wins" className="form-label">
-                What went well today?
-              </label>
-              <textarea
-                id="wins"
-                name="wins"
-                rows={3}
-                className="textarea"
-                placeholder="Wins, progress, small victories..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="blockers" className="form-label">
-                Any blockers?
-              </label>
-              <textarea
-                id="blockers"
-                name="blockers"
-                rows={3}
-                className="textarea"
-                placeholder="What slowed you down..."
-              />
-            </div>
+            {checkinFields.map((field) => (
+              <div key={field.id} className="form-group">
+                <label htmlFor={`checkin-${field.id}`} className="form-label">
+                  {field.label}{" "}
+                  {field.required && <span style={{ color: "#f87171" }}>*</span>}
+                </label>
+                {field.type === "textarea" ? (
+                  <textarea
+                    id={`checkin-${field.id}`}
+                    name={`custom_${field.id}`}
+                    required={field.required}
+                    rows={field.required ? 4 : 3}
+                    className="textarea"
+                    placeholder={field.placeholder ?? ""}
+                  />
+                ) : field.type === "number" ? (
+                  <input
+                    id={`checkin-${field.id}`}
+                    name={`custom_${field.id}`}
+                    type="number"
+                    required={field.required}
+                    className="input"
+                    placeholder={field.placeholder ?? ""}
+                  />
+                ) : (
+                  <input
+                    id={`checkin-${field.id}`}
+                    name={`custom_${field.id}`}
+                    type="text"
+                    required={field.required}
+                    className="input"
+                    placeholder={field.placeholder ?? ""}
+                  />
+                )}
+              </div>
+            ))}
 
             <button type="submit" className="btn btn-primary" style={{ alignSelf: "flex-start" }}>
               Submit daily check-in

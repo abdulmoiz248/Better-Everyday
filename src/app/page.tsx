@@ -56,7 +56,7 @@ export default async function Home() {
                 fontWeight: 600,
               }}
             >
-              Daily Growth Tracker
+              Personal Growth Tracker
             </div>
 
             <h1
@@ -83,8 +83,8 @@ export default async function Home() {
                 marginBottom: 32,
               }}
             >
-              Track skills, build projects, analyze gaps, and get
-              brutally honest weekly reviews. Compound your growth —
+              Track any skill, build habits, and get
+              brutally honest AI-powered reviews. Compound your growth —
               <span style={{ color: "#34d399", fontWeight: 600 }}> 1.01</span>
               <sup style={{ fontSize: "0.625rem", color: "#34d399" }}>365</sup>
               <span style={{ color: "var(--text-muted)" }}> = 37.8×</span>
@@ -100,10 +100,10 @@ export default async function Home() {
                 marginBottom: 32,
               }}
             >
-              <span className="tag tag-blue">Skill Tracker</span>
+              <span className="tag tag-blue">Habit Tracking</span>
               <span className="tag tag-green">Streak System</span>
-              <span className="tag tag-purple">LLM Reviews</span>
-              <span className="tag tag-amber">GitHub Insights</span>
+              <span className="tag tag-purple">AI Reviews</span>
+              <span className="tag tag-amber">Gap Detection</span>
             </div>
 
             <GoogleLoginButton />

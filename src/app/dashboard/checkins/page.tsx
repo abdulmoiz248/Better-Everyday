@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requestMyCheckinLink } from "@/app/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ReflectionRecord, ProfileRecord } from "@/lib/types";
+import { ReflectionRecord, ProfileRecord, UserSettingsRecord, DEFAULT_CHECKIN_FIELDS } from "@/lib/types";
 
 export default async function CheckinsPage() {
   const supabase = await createSupabaseServerClient();
@@ -13,11 +13,11 @@ export default async function CheckinsPage() {
     redirect("/");
   }
 
-  const [{ data: reflectionsData }, { data: profileData }] = await Promise.all([
+  const [{ data: reflectionsData }, { data: profileData }, { data: settingsData }] = await Promise.all([
     supabase
       .from("daily_reflections")
       .select(
-        "id, user_id, learned_today, leetcode_question, blockers, wins, created_at",
+        "id, user_id, learned_today, leetcode_question, blockers, wins, custom_fields, created_at",
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -27,17 +27,27 @@ export default async function CheckinsPage() {
       .select("current_streak, longest_streak, streak_last_updated")
       .eq("user_id", user.id)
       .maybeSingle(),
+    supabase
+      .from("user_settings")
+      .select("checkin_fields")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
   const reflections = (reflectionsData ?? []) as ReflectionRecord[];
   const profile = profileData as Pick<ProfileRecord, "current_streak" | "longest_streak" | "streak_last_updated"> | null;
+  const settings = settingsData as Pick<UserSettingsRecord, "checkin_fields"> | null;
+  const checkinFields = settings?.checkin_fields ?? DEFAULT_CHECKIN_FIELDS;
+
+  // Build a map of field ID to its user-customized label
+  const fieldLabelMap = new Map(checkinFields.map((f) => [f.id, f.label]));
 
   return (
     <>
       <div className="page-header animate-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
         <div>
           <h1>Check-ins</h1>
-          <p>Your daily reflections and learning journal.</p>
+          <p>Your custom daily reflections and learning journal.</p>
         </div>
         <form action={requestMyCheckinLink}>
           <button type="submit" className="btn btn-primary">
@@ -82,56 +92,60 @@ export default async function CheckinsPage() {
               <p className="empty-state-text">No check-ins submitted yet. Request a check-in email to get started!</p>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {reflections.map((entry) => (
-                <div key={entry.id} className="list-item">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      {new Date(entry.created_at).toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
-                    {entry.leetcode_question && (
-                      <span className="tag tag-purple">
-                        🧩 {entry.leetcode_question}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {reflections.map((entry) => {
+                // Dynamically prepare fields to display
+                const fieldsToRender: Array<{ label: string; value: string; isLegacy?: boolean }> = [];
+
+                if (entry.custom_fields && Object.keys(entry.custom_fields).length > 0) {
+                  for (const [fieldId, val] of Object.entries(entry.custom_fields)) {
+                    const label = fieldLabelMap.get(fieldId) || fieldId.charAt(0).toUpperCase() + fieldId.slice(1).replace(/_/g, " ");
+                    if (val) {
+                      fieldsToRender.push({ label, value: val });
+                    }
+                  }
+                } else {
+                  // Legacy fallback
+                  fieldsToRender.push({ label: "What I Learned", value: entry.learned_today, isLegacy: true });
+                  if (entry.leetcode_question) {
+                    fieldsToRender.push({ label: "Practice/Problems Solved", value: entry.leetcode_question, isLegacy: true });
+                  }
+                  if (entry.wins) {
+                    fieldsToRender.push({ label: "Wins", value: entry.wins, isLegacy: true });
+                  }
+                  if (entry.blockers) {
+                    fieldsToRender.push({ label: "Blockers", value: entry.blockers, isLegacy: true });
+                  }
+                }
+
+                return (
+                  <div key={entry.id} className="list-item" style={{ padding: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>
+                        {new Date(entry.created_at).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </span>
-                    )}
-                  </div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
-                      What I Learned
                     </div>
-                    <p style={{ fontSize: "0.8125rem", color: "var(--text-primary)", lineHeight: 1.6 }}>
-                      {entry.learned_today}
-                    </p>
-                  </div>
 
-                  {(entry.wins || entry.blockers) && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      {entry.wins && (
-                        <div>
-                          <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "#34d399", marginBottom: 4 }}>
-                            ✅ Wins
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {fieldsToRender.map((field, idx) => (
+                        <div key={idx}>
+                          <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                            {field.label}
                           </div>
-                          <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>{entry.wins}</p>
+                          <p style={{ fontSize: "0.8125rem", color: "var(--text-primary)", lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>
+                            {field.value}
+                          </p>
                         </div>
-                      )}
-                      {entry.blockers && (
-                        <div>
-                          <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "#f87171", marginBottom: 4 }}>
-                            🚫 Blockers
-                          </div>
-                          <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>{entry.blockers}</p>
-                        </div>
-                      )}
+                      ))}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -8,12 +8,19 @@ import { generateBrutalReview } from "@/lib/brutal-review";
 export async function computeAndSaveWeeklyReview(userId: string, weekStartDate: Date, weekEndDate: Date) {
   const supabase = createSupabaseAdminClient();
 
-  // Get user profile
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("github_username, leetcode_username")
-    .eq("user_id", userId)
-    .single();
+  // Get user profile and settings
+  const [{ data: profile, error: profileError }, { data: settings }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("github_username, leetcode_username, full_name")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("user_settings")
+      .select("review_context")
+      .eq("user_id", userId)
+      .maybeSingle()
+  ]);
 
   if (profileError || !profile) {
     throw new Error("User profile not found");
@@ -62,10 +69,11 @@ export async function computeAndSaveWeeklyReview(userId: string, weekStartDate: 
 
   // Generate brutal review
   const llmFeedback = await generateBrutalReview({
-    username: profile.github_username || "User",
+    username: profile.full_name || profile.github_username || "User",
     weekStartDate,
     weekEndDate,
     metrics,
+    reviewContext: settings?.review_context || "",
   });
 
   // Save to weekly_reviews table

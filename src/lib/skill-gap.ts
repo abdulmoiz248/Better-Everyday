@@ -44,6 +44,7 @@ type BuildSkillGapInput = {
   >[];
   githubAnalysis: GitHubAnalysisRecord | null;
   leetcodeAnalysis: LeetCodeAnalysisRecord | null;
+  trackedAreasConfig?: Array<{ name: string; aliases: string[] }>;
 };
 
 function daysBetween(from: Date, to: Date) {
@@ -163,7 +164,15 @@ export function buildSkillGapAnalysis(input: BuildSkillGapInput): SkillGapAnalys
       input.leetcodeAnalysis?.analyzedAt,
     ]) ?? now;
 
-  const trackedAreas = TRACKED_AREAS.map((area) => {
+  const activeTrackedAreas = input.trackedAreasConfig && input.trackedAreasConfig.length > 0
+    ? input.trackedAreasConfig.map(area => ({
+        name: area.name,
+        aliases: area.aliases,
+        leetcodeAliases: area.aliases,
+      }))
+    : TRACKED_AREAS;
+
+  const trackedAreas = activeTrackedAreas.map((area) => {
     const lastTouchedAt = getLastTouchedDate(area, input);
     const daysSinceTouched = lastTouchedAt ? daysBetween(lastTouchedAt, activityAnchor) : 999;
 
@@ -247,31 +256,38 @@ export function buildSkillGapAnalysis(input: BuildSkillGapInput): SkillGapAnalys
     }
   }
 
-  const systemDesignSkill = input.skills.some((skill) =>
-    containsAlias(skill.name, ["system design", "distributed", "architecture"]),
-  );
-  const githubDesignSignal = Boolean(
-    input.githubAnalysis?.inferredSkills.some((skill) =>
-      containsAlias(skill, ["system design", "backend systems"]),
-    ) ||
-      input.githubAnalysis?.sampleRepos.some((repo) =>
-        repo.topics.some((topic) => containsAlias(topic, ["system-design", "architecture"])),
-      ),
-  );
+  // Only run System Design check if the user is using GitHub or has developer-oriented tracked areas
+  const isDevUser = input.githubAnalysis !== null || 
+    input.leetcodeAnalysis !== null || 
+    activeTrackedAreas.some(area => containsAlias(area.name, ["system design", "programming", "software", "coding", "developer", "engineering"]));
 
-  if (!systemDesignSkill && !githubDesignSignal) {
-    insights.push({
-      id: "system-design-signal-missing",
-      title: "System design practice is missing",
-      message:
-        "There are no strong recent system design signals in your skill log or GitHub profile. This can become a bottleneck as problem difficulty increases.",
-      severity: "medium",
-      evidence: buildEvidenceList([
-        "No system-design-like skill entries detected",
-        "No system-design-like repository topics inferred",
-      ]),
-    });
-    recommendations.add("Add one weekly system design drill (API + data model + scaling notes).");
+  if (isDevUser) {
+    const systemDesignSkill = input.skills.some((skill) =>
+      containsAlias(skill.name, ["system design", "distributed", "architecture"]),
+    );
+    const githubDesignSignal = Boolean(
+      input.githubAnalysis?.inferredSkills.some((skill) =>
+        containsAlias(skill, ["system design", "backend systems"]),
+      ) ||
+        input.githubAnalysis?.sampleRepos.some((repo) =>
+          repo.topics.some((topic) => containsAlias(topic, ["system-design", "architecture"])),
+        ),
+    );
+
+    if (!systemDesignSkill && !githubDesignSignal) {
+      insights.push({
+        id: "system-design-signal-missing",
+        title: "System design practice is missing",
+        message:
+          "There are no strong recent system design signals in your skill log or GitHub profile. This can become a bottleneck as problem difficulty increases.",
+        severity: "medium",
+        evidence: buildEvidenceList([
+          "No system-design-like skill entries detected",
+          "No system-design-like repository topics inferred",
+        ]),
+      });
+      recommendations.add("Add one weekly system design drill (API + data model + scaling notes).");
+    }
   }
 
   if (insights.length === 0) {

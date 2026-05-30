@@ -1,9 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  requestMyCheckinLink,
-} from "@/app/actions";
+import { requestMyCheckinLink } from "@/app/actions";
 import {
   ProfileRecord,
   SkillRecord,
@@ -37,7 +35,7 @@ export default async function DashboardPage() {
     supabase
       .from("daily_reflections")
       .select(
-        "id, user_id, learned_today, leetcode_question, blockers, wins, created_at",
+        "id, user_id, learned_today, leetcode_question, blockers, wins, custom_fields, created_at",
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -121,7 +119,7 @@ export default async function DashboardPage() {
               {lastWeeklyReview?.depth_score != null && <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>%</span>}
             </div>
             <div className="stat-label">Depth Score</div>
-            <div className="stat-sub">Hard vs Easy ratio</div>
+            <div className="stat-sub">Learning focus/depth</div>
             {lastWeeklyReview?.depth_score != null && (
               <div className="metric-gauge">
                 <div
@@ -230,7 +228,7 @@ export default async function DashboardPage() {
           <div className="glass-card-body">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h2 className="section-title">Weekly Brutal Review</h2>
-              <Link href="/dashboard/reviews" className="btn btn-secondary btn-sm">
+              <Link href="/dashboard/reviews" className="btn btn-secondary btn-sm" style={{ textDecoration: "none" }}>
                 View all
               </Link>
             </div>
@@ -244,7 +242,7 @@ export default async function DashboardPage() {
                 </p>
                 <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>Problems:</span>
+                    <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>Logs:</span>
                     <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>{lastWeeklyReview.problems_solved ?? 0}</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -271,7 +269,7 @@ export default async function DashboardPage() {
           <div className="glass-card-body">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h2 className="section-title">Recent Check-ins</h2>
-              <Link href="/dashboard/checkins" className="btn btn-secondary btn-sm">
+              <Link href="/dashboard/checkins" className="btn btn-secondary btn-sm" style={{ textDecoration: "none" }}>
                 View all
               </Link>
             </div>
@@ -282,29 +280,40 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {reflections.slice(0, 4).map((entry) => (
-                  <div key={entry.id} className="list-item">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>
-                        {new Date(entry.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </span>
-                      {entry.leetcode_question && (
-                        <span className="tag tag-purple" style={{ fontSize: "0.625rem" }}>
-                          LC: {entry.leetcode_question.length > 20 ? entry.leetcode_question.slice(0, 20) + "…" : entry.leetcode_question}
+                {reflections.slice(0, 4).map((entry) => {
+                  // Fallback for custom fields vs standard learned_today
+                  const primaryText = entry.custom_fields && Object.values(entry.custom_fields)[0]
+                    ? Object.values(entry.custom_fields)[0]
+                    : entry.learned_today;
+
+                  const badgeText = entry.custom_fields && Object.values(entry.custom_fields)[1]
+                    ? Object.values(entry.custom_fields)[1]
+                    : entry.leetcode_question;
+
+                  return (
+                    <div key={entry.id} className="list-item" style={{ padding: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>
+                          {new Date(entry.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </span>
-                      )}
+                        {badgeText && (
+                          <span className="tag tag-purple" style={{ fontSize: "0.625rem" }}>
+                            {badgeText.length > 20 ? badgeText.slice(0, 20) + "…" : badgeText}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: "0.8125rem", color: "var(--text-primary)", lineHeight: 1.5, margin: 0 }}>
+                        {primaryText.length > 120
+                          ? primaryText.slice(0, 120) + "..."
+                          : primaryText}
+                      </p>
                     </div>
-                    <p style={{ fontSize: "0.8125rem", color: "var(--text-primary)", lineHeight: 1.5 }}>
-                      {entry.learned_today.length > 120
-                        ? entry.learned_today.slice(0, 120) + "..."
-                        : entry.learned_today}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -317,20 +326,20 @@ export default async function DashboardPage() {
           <div className="glass-card-body">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h2 className="section-title">Active Projects</h2>
-              <Link href="/dashboard/projects" className="btn btn-secondary btn-sm">
+              <Link href="/dashboard/projects" className="btn btn-secondary btn-sm" style={{ textDecoration: "none" }}>
                 Manage
               </Link>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {activeProjects.slice(0, 3).map((project) => (
-                <div key={project.id} className="list-item" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div key={project.id} className="list-item" style={{ display: "flex", alignItems: "center", gap: 16, padding: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-primary)" }}>{project.title}</span>
                       <span className="badge badge-info">{project.progress_percent}%</span>
                     </div>
                     {project.current_focus && (
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Focus: {project.current_focus}</p>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>Focus: {project.current_focus}</p>
                     )}
                   </div>
                   <div style={{ width: 120 }}>

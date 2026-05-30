@@ -28,25 +28,39 @@ function isWithinRange(date: Date, start: Date, end: Date): boolean {
   return d >= start && d <= end;
 }
 
-// Calculate depth: ratio of medium/hard to total problems
-function computeDepthScore(leetcodeAnalysis: LeetCodeAnalysisRecord | null): number {
-  if (!leetcodeAnalysis) {
-    return 0;
+// Calculate depth: ratio of medium/hard to total problems, or fallback based on focus/skills/projects
+function computeDepthScore(
+  leetcodeAnalysis: LeetCodeAnalysisRecord | null,
+  skills: Pick<SkillRecord, "status">[] = [],
+  projectUpdates: Pick<ProjectUpdateRecord, "update_note">[] = [],
+): number {
+  if (leetcodeAnalysis && leetcodeAnalysis.solvedCount.total > 0) {
+    const { total, easy, medium, hard } = leetcodeAnalysis.solvedCount;
+    const hardCount = medium + hard;
+    const ratio = hardCount / total;
+
+    // Score: 0 if all easy, 100 if balanced or hard-heavy
+    // Target: 40-60% medium/hard
+    if (ratio <= 0.2) return 20;
+    if (ratio <= 0.4) return 50;
+    if (ratio <= 0.6) return 100;
+    if (ratio <= 0.8) return 80;
+    return 60; // Too hard-heavy can be inefficient
   }
 
-  const { total, easy, medium, hard } = leetcodeAnalysis.solvedCount;
-  if (total === 0) return 0;
+  // Generic fallback: base depth score on active learning and projects
+  let score = 40; // Base score for showing up
 
-  const hardCount = medium + hard;
-  const ratio = hardCount / total;
+  const learningOrCompleted = skills.filter(
+    (s) => s.status === "learning" || s.status === "completed",
+  ).length;
+  score += learningOrCompleted * 10;
 
-  // Score: 0 if all easy, 100 if balanced or hard-heavy
-  // Target: 40-60% medium/hard
-  if (ratio <= 0.2) return 20;
-  if (ratio <= 0.4) return 50;
-  if (ratio <= 0.6) return 100;
-  if (ratio <= 0.8) return 80;
-  return 60; // Too hard-heavy can be inefficient
+  if (projectUpdates.length > 0) {
+    score += 20;
+  }
+
+  return Math.min(100, score);
 }
 
 // Calculate consistency: did user check in daily?
@@ -117,32 +131,41 @@ function computeVarietyScore(
   return 100;
 }
 
-// Count problems solved in week (estimate from reflections if LeetCode not available)
+// Count problems solved or general items logged in week
 function countProblemsSolved(
   start: Date,
   end: Date,
   leetcodeAnalysis: LeetCodeAnalysisRecord | null,
   reflections: Pick<ReflectionRecord, "leetcode_question" | "created_at">[],
+  projectUpdates: Pick<ProjectUpdateRecord, "created_at">[] = [],
+  skills: Pick<SkillRecord, "status" | "created_at">[] = [],
 ): number {
   if (leetcodeAnalysis) {
     return leetcodeAnalysis.solvedCount.total;
   }
 
-  // Fallback: count mentions of "solved" or "problem" in reflections
+  // Generic fallback: total logged activities this week
   let count = 0;
   for (const reflection of reflections) {
     if (isWithinRange(new Date(reflection.created_at), start, end)) {
-      const qText = reflection.leetcode_question || "";
-      if (qText.toLowerCase().includes("solved") || qText.toLowerCase().includes("problem")) {
-        count++;
-      }
+      count++;
+    }
+  }
+  for (const update of projectUpdates) {
+    if (isWithinRange(new Date(update.created_at), start, end)) {
+      count++;
+    }
+  }
+  for (const skill of skills) {
+    if (skill.status === "completed" && isWithinRange(new Date(skill.created_at), start, end)) {
+      count++;
     }
   }
 
   return count;
 }
 
-// Estimate hours (1 per reflection as rough estimate)
+// Estimate hours (1.5 per reflection/check-in session as rough estimate)
 function estimateHours(
   start: Date,
   end: Date,
@@ -185,7 +208,7 @@ export function computeWeeklyMetrics(input: ComputeMetricsInput): WeeklyMetrics 
     end: input.endDate,
   };
 
-  const depthScore = computeDepthScore(input.leetcodeAnalysis);
+  const depthScore = computeDepthScore(input.leetcodeAnalysis, input.skills as any, input.projectUpdates as any);
   const consistencyScore = computeConsistencyScore(
     metricsRange.start,
     metricsRange.end,
@@ -207,6 +230,8 @@ export function computeWeeklyMetrics(input: ComputeMetricsInput): WeeklyMetrics 
     metricsRange.end,
     input.leetcodeAnalysis,
     input.reflections,
+    input.projectUpdates as any,
+    input.skills as any,
   );
 
   const totalHours = estimateHours(metricsRange.start, metricsRange.end, input.reflections);
