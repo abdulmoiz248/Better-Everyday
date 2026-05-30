@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "./theme-toggle";
 
 const navItems = [
   {
@@ -190,7 +191,7 @@ export default function Sidebar({ userEmail, userName }: SidebarProps) {
         >
           BetterEveryday
         </span>
-        <div style={{ width: 36 }} />
+        <ThemeToggle />
       </div>
 
       {/* Overlay */}
@@ -220,6 +221,10 @@ export default function Sidebar({ userEmail, userName }: SidebarProps) {
         </nav>
 
         <div className="sidebar-footer">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 8px" }}>
+            <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 600 }}>Theme</span>
+            <ThemeToggle />
+          </div>
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{initials}</div>
             <div className="sidebar-user-info">

@@ -98,7 +98,7 @@ export default async function ProjectsPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {activeProjects.map((project) => (
-                  <div key={project.id} style={{ padding: 16, borderRadius: "var(--radius-lg)", border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.02)" }}>
+                  <div key={project.id} style={{ padding: 16, borderRadius: "var(--radius-lg)", border: "1px solid var(--glass-border)", background: "var(--list-item-bg)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                       <span style={{ fontSize: "0.9375rem", fontWeight: 600 }}>{project.title}</span>
                       <span className="badge badge-info">{project.progress_percent}%</span>

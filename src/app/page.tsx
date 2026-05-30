@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { GoogleLoginButton } from "@/components/google-login-button";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { LoginThemeToggle } from "@/components/login-theme-toggle";
 
 export default async function Home() {
   const supabase = await createSupabaseServerClient();
@@ -26,6 +27,9 @@ export default async function Home() {
     >
       {/* Ambient glow */}
       <div className="ambient-bg" />
+
+      {/* Theme toggle */}
+      <LoginThemeToggle />
 
       <main
         style={{
